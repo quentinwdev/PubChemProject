@@ -6,10 +6,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections import OrderedDict
 
-# -------------------------
-# Helpers
-# -------------------------
-
 
 def detect_delimiter(filepath, nbytes=4096):
     """Try to detect delimiter using csv.Sniffer. Fallback to comma."""
@@ -28,9 +24,8 @@ def clean_count_series(s):
     Non-convertible entries become NaN.
     """
     s2 = s.astype(str).str.strip()
-    # Remove thousands separators like "1,234"
     s2 = s2.str.replace(',', '', regex=False)
-    # Convert to numeric
+    # convert to numeric
     return pd.to_numeric(s2, errors='coerce')
 
 
@@ -57,11 +52,7 @@ def save_summary_row(rows, filename):
     df = pd.DataFrame(rows)
     df.to_csv(filename, index=False)
 
-# -------------------------
-# Main plotting function
-# -------------------------
-
-
+# plotting function
 def plot_distributions(series, name, outdir, summary_rows):
     s = series.dropna()
     if s.size == 0:
@@ -69,7 +60,7 @@ def plot_distributions(series, name, outdir, summary_rows):
             f"[warning] {name} has no numeric values after cleaning. Skipping.")
         return
 
-    # Basic stats
+    # basic stats
     stats = OrderedDict()
     stats['column'] = name
     stats['count_nonnull'] = int(s.size)
@@ -86,7 +77,7 @@ def plot_distributions(series, name, outdir, summary_rows):
     stats['num_positive'] = int((s > 0).sum())
     summary_rows.append(stats)
 
-    # Histogram (normalized as probability density)
+    # probability density histogram
     plt.figure(figsize=(7, 4))
     plt.hist(s, bins='auto', density=True, alpha=0.75)
     plt.xlabel(name)
@@ -97,7 +88,7 @@ def plot_distributions(series, name, outdir, summary_rows):
     plt.savefig(outfile, dpi=150)
     plt.close()
 
-    # Histogram on log1p scale (handles zeros)
+    # histogram on log1p scale
     plt.figure(figsize=(7, 4))
     plt.hist(np.log1p(s), bins='auto', density=True, alpha=0.75)
     plt.xlabel(f'log1p({name})')
@@ -120,7 +111,7 @@ def plot_distributions(series, name, outdir, summary_rows):
     plt.savefig(outfile, dpi=150)
     plt.close()
 
-    # Boxplot (horizontal)
+    # horizontal boxplot
     plt.figure(figsize=(7, 2.5))
     plt.boxplot(s, vert=False, notch=True, showfliers=True)
     plt.xlabel(name)
@@ -130,18 +121,14 @@ def plot_distributions(series, name, outdir, summary_rows):
     plt.savefig(outfile, dpi=150)
     plt.close()
 
-    # PMF (value counts) only if not too many unique values
+    # pmf
     if stats['unique_count'] <= 120:
         outfile = os.path.join(outdir, f"{name}_pmf.png")
         small_pmf_plot(s, name, outfile)
 
     print(f"[info] Saved plots for {name} in {outdir}")
 
-# -------------------------
-# CLI & main
-# -------------------------
-
-
+# cli + main
 def main():
     parser = argparse.ArgumentParser(
         description="Plot distribution of PubMed_Count and Patent_Count")
@@ -159,19 +146,18 @@ def main():
     delim = detect_delimiter(infile)
     print(f"[info] Using delimiter: '{delim}' to read {infile}")
 
-    # Read CSV
+    # read CSV
     try:
         df = pd.read_csv(infile, sep=delim, engine='c',
                          dtype=str, encoding='utf-8', low_memory=False)
     except Exception as e:
-        # Fallback to python engine if c engine fails
         try:
             df = pd.read_csv(infile, sep=delim, engine='python',
                              dtype=str, encoding='utf-8')
         except Exception as e2:
             raise SystemExit(f"Failed to read CSV: {e2}")
 
-    # Clean and plot each target column
+    # clean and plot
     summary_rows = []
     for col in args.columns:
         if col not in df.columns:
@@ -181,7 +167,7 @@ def main():
         cleaned = clean_count_series(df[col])
         plot_distributions(cleaned, col, outdir, summary_rows)
 
-    # Save summary stats
+    # save summary stats
     if summary_rows:
         summary_file = os.path.join(outdir, "summary_stats.csv")
         save_summary_row(summary_rows, summary_file)
